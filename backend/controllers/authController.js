@@ -6,28 +6,26 @@ const { generateOTP } = require("../utils/otpGenerator");
 
 // l'inscription d'un utilisateur
 exports.register = async (req, res) => {
-  const { name, email, password, phoneNumber, role } = req.body;
+  const { name, email, password, phoneNumber, role, institution, specialty, profileImage } = req.body;
 
   try {
-    // Validate role (only allow chercheur or technicien)
-    if (!["chercheur", "technicien"].includes(role)) {
-      return res.status(400).json({ message: "Invalid role" });
-    }
-
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({
       name,
       email,
       password: hashedPassword,
       phoneNumber,
-      role, // Assign the role
+      role,
+      institution,
+      specialty,
+      profileImage,
     });
 
     await user.save();
 
-    // Generate verification token
+    // Génération du token de vérification
     const verificationToken = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -35,7 +33,7 @@ exports.register = async (req, res) => {
     user.verificationToken = verificationToken;
     await user.save();
 
-    const verificationLink = `http://localhost:5000/auth/verify-email?token=${verificationToken}`;
+    const verificationLink = `http://localhost:3000/auth/verify-email?token=${verificationToken}`;
     sendEmail(
       user.email,
       "Vérification de votre e-mail",
@@ -50,7 +48,6 @@ exports.register = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 // Vérification de l'email
 exports.verifyEmail = async (req, res) => {
@@ -78,63 +75,116 @@ exports.verifyEmail = async (req, res) => {
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ message: "User not found" });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(401).json({ message: "Invalid credentials" });
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-    if (!user.isVerified) {
-      return res
-        .status(403)
-        .json({ message: "Please verify your email before logging in." });
-    }
-
-    // Generate JWT token with role
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
-
-    res.json({ message: "Login successful", token, role: user.role });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  if (!user.isVerified) {
+    return res
+      .status(403)
+      .json({ message: "Please verify your email before logging in." });
   }
-};
 
-
-// Route pour la verification d'un OTP
-exports.verifyOTP = async (req, res) => {
-  const { email, otp } = req.body;
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Vérifiez si l'OTP est valide et s'il n'a pas expiré
-    if (user.otp === otp && user.otpExpires > Date.now()) {
-      user.otp = undefined;
-      user.otpExpires = undefined;
-      await user.save();
-
+  // Logic for OTP sending only if required
+  if (!user.otp || user.otpExpires < Date.now()) {
+    const lastOTPSentAt = user.lastOTPSentAt;
+    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    if (lastOTPSentAt && lastOTPSentAt > oneWeekAgo) {
       const token = jwt.sign(
         { id: user._id, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: "1h" }
       );
-
-      res.json({ message: "OTP verified successfully", token });
+      res.json({ token , user: { role: user.role } });
     } else {
-      res.status(400).json({ message: "Invalid or expired OTP" });
+      // Generate a new OTP and send it to the user
+      const otp = generateOTP();
+      user.otp = otp;
+      user.otpExpires = Date.now() + 3 * 60 * 1000;
+      user.lastOTPSentAt = Date.now();
+      await user.save();
+
+      sendEmail(user.email, "Your OTP", `Your OTP is ${otp}`);
+      res.json({ message: "OTP sent to email" });
     }
+  } else {
+    // OTP is still valid, generate a JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+    res.json({ token, user: { role: user.role } });
+  }
+};
+
+// la verification d'un OTP
+exports.verifyOTP = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!user.otp || user.otpExpires < Date.now())
+      return res.status(400).json({ message: "OTP expired or not found" });
+
+    if (user.otp !== otp)
+      return res.status(400).json({ message: "Invalid OTP" });
+
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+    res.json({ message: "OTP verified successfully", token });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
 
+// forget password
+exports.forgetPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user
+      = await
+        User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    // Générer un nouveau code OTP et l'envoyer à l'utilisateur
+    const otp = generateOTP();
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+    sendEmail(user.email, "Your OTP", `Your OTP is ${otp}`);
+    res.json({ message: "OTP sent to email" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+  
+// reset password
+exports.resetPassword = async (req, res) => {
+  const { email, newPassword } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10 );
+      const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    user.password = hashedPassword;
+    await user.save();
+    res.json({ message: "Password reset successful" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
