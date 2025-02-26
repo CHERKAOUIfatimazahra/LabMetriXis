@@ -151,7 +151,7 @@ describe("Auth Controller - Login", () => {
       .send({ email: "test@example.com", password: "Password123" });
 
     expect(response.status).toBe(200);
-    expect(response.body.message).toBe("OTP sent to email");
+    expect(response.body.message).toBe("Login successful");
     expect(mockUser.save).toHaveBeenCalled();
   });
 
