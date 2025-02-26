@@ -4,46 +4,63 @@ const Sample = require("../models/Sample");
 // Project Management Controllers
 exports.createProject = async (req, res) => {
   try {
-    // validation body
     const {
       projectName,
       researchDomains,
       teamLead,
+      fundingSource,
       budget,
       startDate,
       deadline,
       status,
       collaboratingInstitutions,
       description,
+      expectedOutcomes,
+      teamMembers,
     } = req.body;
+
+    // Validate required fields
     if (
       !projectName ||
       !researchDomains ||
       !teamLead ||
-      !budget ||
       !startDate ||
       !deadline ||
-      !collaboratingInstitutions ||
       !description
     ) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "Missing required fields" });
     }
-    // create project
-    const project = await Project.create({
+
+    // Create project
+    const project = new Project({
       projectName,
-      researchDomains,
+      researchDomain: researchDomains,
       teamLead,
+      teamMembers: teamMembers.map((member) => ({
+        user: member.id,
+        role: member.role,
+      })),
+      fundingSource,
       budget,
       startDate,
       deadline,
       status,
       collaboratingInstitutions,
       description,
-      createdBy: req.user.id,
+      expectedOutcomes,
+      createdBy: req.user._id,
     });
-    res.status(201).json({ message: "Project created successfully", project });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    await project.save();
+
+    res.status(201).json({
+      message: "Project created successfully",
+      project,
+      projectId: project._id,
+    });
+  } catch (error) {
+    console.error("Project creation error:", error);
+    res.status(500).json({ error: "Failed to create project" });
   }
 };
 exports.getAllProjects = async (req, res) => {
