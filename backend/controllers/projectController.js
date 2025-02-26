@@ -63,6 +63,83 @@ exports.createProject = async (req, res) => {
     res.status(500).json({ error: "Failed to create project" });
   }
 };
+
+exports.addSampleToProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const sampleData = req.body;
+
+    // Create new sample with project reference
+    const sample = new Sample({
+      ...sampleData,
+      project: projectId,
+      createdBy: req.user._id,
+      technicianResponsible: sampleData.technician || req.user._id,
+    });
+
+    await sample.save();
+
+    // Add sample reference to project
+    await Project.findByIdAndUpdate(projectId, {
+      $push: { samples: sample._id },
+    });
+
+    res.status(201).json({
+      message: "Sample added successfully",
+      sample,
+    });
+  } catch (error) {
+    console.error("Error adding sample:", error);
+    res.status(500).json({ error: "Failed to add sample" });
+  }
+};
+
+
+exports.getSamplesByProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const samples = await Sample.find({ project: projectId }).sort({
+      createdAt: -1,
+    });
+    res.json(samples);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.find({ createdBy: req.user.id })
