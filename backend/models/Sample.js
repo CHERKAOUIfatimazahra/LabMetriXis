@@ -1,32 +1,41 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const sampleSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    description: { type: String, required: true },
-    status: {
-      type: String,
-      enum: ["Assigned", "In Progress", "Completed"],
-      default: "Assigned",
-    },
-    project: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Project",
-      required: true,
-    },
-    assignedTo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    report: {
-      content: { type: String, default: null },
-      createdAt: { type: Date, default: null },
-    },
+const sampleSchema = new Schema({
+  identification: { type: String, required: true, unique: true },
+  type: { type: String, required: true },
+  quantity: { type: String, required: true },
+  storageConditions: [{ type: String }],
+  storageLocation: [{ type: String }],
+  technician: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
   },
-  {
-    timestamps: true,
-  }
-);
+  collectionDate: { type: Date },
+  expirationDate: { type: Date },
+  protocolFile: {
+    fileName: { type: String },
+    fileLocation: { type: String },
+    fileType: { type: String },
+    uploadDate: { type: Date, default: Date.now },
+  },
+  sampleReport: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ["Available", "In Use", "Depleted", "Compromised", "Reserved"],
+    default: "Available",
+  },
+  project: {
+    type: Schema.Types.ObjectId,
+    ref: "Project",
+  },
+  createdBy: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
 
 module.exports = mongoose.model("Sample", sampleSchema);
