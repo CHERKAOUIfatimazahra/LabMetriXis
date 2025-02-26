@@ -17,6 +17,31 @@ router.post(
   isChercheur,
   projectController.createProject
 );
+
+// Sample routes
+router.post(
+  "/projects/:projectId/samples",
+  verifyToken,
+  isChercheur,
+  projectController.addSampleToProject
+);
+
+router.get(
+  "/projects/:projectId/samples",
+  verifyToken,
+  projectController.getSamplesByProject
+);
+
+
+
+
+
+
+
+
+
+
+
 router.get("/projects", verifyToken, projectController.getAllProjects);
 router.get(
   "/projects/:projectId",
