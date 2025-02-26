@@ -1,11 +1,22 @@
 const express = require("express");
 const router = express.Router();
 const { verifyToken } = require("../../middleware/authMiddleware");
-const { isOrganizer } = require("../../middleware/roleMiddleware");
+const { isChercheur } = require("../../middleware/roleMiddleware");
 const projectController = require("../../controllers/projectController");
+const userController = require("../../controllers/userController");
 
 // Project routes
-router.post("/project", projectController.createProject);
+router.get(
+  "/available-team-members",
+  verifyToken,
+  userController.getAvailableTeamMembers
+);
+router.post(
+  "/project",
+  verifyToken,
+  isChercheur,
+  projectController.createProject
+);
 router.get("/projects", verifyToken, projectController.getAllProjects);
 router.get(
   "/projects/:projectId",
