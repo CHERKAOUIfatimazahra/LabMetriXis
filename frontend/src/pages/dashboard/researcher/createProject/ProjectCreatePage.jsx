@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../../../components/Header";
 import Sidebar from "../../../../components/Sidebar";
@@ -16,9 +16,11 @@ function ProjectCreatePage() {
   const [activeTab, setActiveTab] = useState("projects");
   const [selectedMember, setSelectedMember] = useState("");
   const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     projectName: "",
-    researchDomains:"",
+    researchDomains: "",
     teamLead: "",
     fundingSource: "",
     budget: "",
@@ -33,6 +35,30 @@ function ProjectCreatePage() {
     samples: [],
   });
 
+  // Fetch available users when component mounts
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/project/available-team-members`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setAvailableUsers(response.data);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
@@ -41,40 +67,13 @@ function ProjectCreatePage() {
     });
   };
 
-  // Team members list with more complete data
-  const availableTeamMembers = [
-    {
-      id: 1,
-      name: "John Doe",
-      role: "Chercheur",
-      specialty: "Biologie moléculaire",
-      institution: "Université de Montréal",
-    },
-    {
-      id: 2,
-      name: "Jane Doe",
-      role: "Technicien",
-      specialty: "Analyses chimiques",
-      institution: "Institut de recherche",
-    },
-    {
-      id: 3,
-      name: "Bob Smith",
-      role: "Doctorant",
-      specialty: "Bioinformatique",
-      institution: "Université de Montréal",
-    },
-  ];
-
   // Handle adding team member
   const handleAddTeamMember = () => {
     if (selectedMember) {
-      const selectedId = parseInt(selectedMember, 10);
-      const memberToAdd = availableTeamMembers.find((m) => m.id === selectedId);
-
+      const memberToAdd = availableUsers.find((m) => m._id === selectedMember);
       if (
         memberToAdd &&
-        !selectedTeamMembers.some((m) => m.id === memberToAdd.id)
+        !selectedTeamMembers.some((m) => m._id === memberToAdd._id)
       ) {
         setSelectedTeamMembers([...selectedTeamMembers, memberToAdd]);
         setSelectedMember("");
@@ -85,7 +84,7 @@ function ProjectCreatePage() {
   // Handle removing team member
   const handleRemoveTeamMember = (memberId) => {
     setSelectedTeamMembers(
-      selectedTeamMembers.filter((member) => member.id !== memberId)
+      selectedTeamMembers.filter((member) => member._id !== memberId)
     );
   };
 
@@ -104,30 +103,47 @@ function ProjectCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Collect form data
-    const finalFormData = {
-      ...formData,
-      teamMembers: selectedTeamMembers,
-    };
-
     try {
-      // Send form data to server white auth token
+      const token = localStorage.getItem("token");
+
+      // Format team members data for the API
+      const formattedTeamMembers = selectedTeamMembers.map((member) => ({
+        user: member._id,
+        role: member.role,
+      }));
+
+      const finalFormData = {
+        ...formData,
+        teamLead: formData.teamLead, // This should be a user ID
+        teamMembers: formattedTeamMembers,
+      };
+
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/project/project`,
         finalFormData,
-        
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
 
-      // Handle success response
       if (response.status === 201) {
-        const project = await response.data;
-        console.log(project);
-        // Redirect to project details page
-        window.location.href = navigate(`/dashboard/researcher/projects/create/add-sample/${projectId}`);
+        const { project, projectId } = response.data;
+        navigate(
+          `/dashboard/researcher/projects/create/add-sample/${projectId}`
+        );
       }
     } catch (error) {
-      // Handle error response
-      console.error(error);
+      console.error("Error creating project:", error);
+      if (error.response?.status === 403) {
+        alert(
+          "You don't have permission to create projects. Only researchers can create projects."
+        );
+      } else {
+        alert("Failed to create project. Please try again.");
+      }
     }
   };
 
@@ -395,7 +411,6 @@ function ProjectCreatePage() {
                   <h2 className="text-lg font-semibold text-teal-700 mb-4">
                     <FaUsers className="inline mr-2" /> Équipe de recherche
                   </h2>
-
                   <div className="mb-4">
                     <label
                       htmlFor="teamLead"
@@ -403,17 +418,26 @@ function ProjectCreatePage() {
                     >
                       Responsable du projet*
                     </label>
-                    <input
-                      type="text"
+                    <select
                       id="teamLead"
                       name="teamLead"
                       value={formData.teamLead}
                       onChange={handleChange}
                       className="w-full md:w-80 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
                       required
-                    />
+                    >
+                      <option value="">Sélectionner un responsable</option>
+                      {availableUsers
+                        .filter((user) => user.role === "chercheur")
+                        .map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.name} - {user.institution}
+                          </option>
+                        ))}
+                    </select>
                   </div>
 
+                  {/* Team Members Selection */}
                   <div className="flex flex-wrap gap-4 mb-4">
                     <div className="w-full md:w-80">
                       <label
@@ -432,9 +456,9 @@ function ProjectCreatePage() {
                           <option value="">
                             Sélectionner un collaborateur
                           </option>
-                          {availableTeamMembers.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.name} - {member.role}
+                          {availableUsers.map((user) => (
+                            <option key={user._id} value={user._id}>
+                              {user.name} - {user.role}
                             </option>
                           ))}
                         </select>
@@ -450,6 +474,7 @@ function ProjectCreatePage() {
                     </div>
                   </div>
 
+                  {/* Team Members Table */}
                   {selectedTeamMembers.length > 0 && (
                     <div className="overflow-x-auto mt-4">
                       <table className="min-w-full bg-white border border-gray-200">
@@ -474,7 +499,7 @@ function ProjectCreatePage() {
                         </thead>
                         <tbody>
                           {selectedTeamMembers.map((member) => (
-                            <tr key={member.id} className="hover:bg-gray-50">
+                            <tr key={member._id} className="hover:bg-gray-50">
                               <td className="py-2 px-4 border-b font-medium">
                                 {member.name}
                               </td>
@@ -491,7 +516,7 @@ function ProjectCreatePage() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    handleRemoveTeamMember(member.id)
+                                    handleRemoveTeamMember(member._id)
                                   }
                                   className="text-red-500 hover:text-red-700 transition duration-150"
                                   aria-label="Retirer ce membre"
