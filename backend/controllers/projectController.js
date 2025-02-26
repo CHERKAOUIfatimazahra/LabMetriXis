@@ -1,26 +1,51 @@
 const Project = require("../models/Project");
 const Sample = require("../models/Sample");
-const Report = require("../models/Report");
 
 // Project Management Controllers
 exports.createProject = async (req, res) => {
   try {
-    const { title, description } = req.body;
-
-    const project = new Project({
-      title,
+    // validation body
+    const {
+      projectName,
+      researchDomains,
+      teamLead,
+      budget,
+      startDate,
+      deadline,
+      status,
+      collaboratingInstitutions,
+      description,
+    } = req.body;
+    if (
+      !projectName ||
+      !researchDomains ||
+      !teamLead ||
+      !budget ||
+      !startDate ||
+      !deadline ||
+      !collaboratingInstitutions ||
+      !description
+    ) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    // create project
+    const project = await Project.create({
+      projectName,
+      researchDomains,
+      teamLead,
+      budget,
+      startDate,
+      deadline,
+      status,
+      collaboratingInstitutions,
       description,
       createdBy: req.user.id,
-      status: "In Progress",
     });
-
-    await project.save();
     res.status(201).json({ message: "Project created successfully", project });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
-
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.find({ createdBy: req.user.id })
@@ -69,12 +94,65 @@ exports.updateProject = async (req, res) => {
 };
 
 // Sample Management Controllers
+exports.createSample = async (req, res) => {
+  try {
+    const { name, description, project } = req.body;
+    const sample = await Sample.create({
+      name,
+      description,
+      project: project._id,
+      createdBy: req.user.id,
+      status: "Assigned",
+      assignedTo: project.createdBy,
+    });
+    res.json(sample);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateSample = async (req, res) => {
+  try {
+    const { name, description, status } = req.body;
+    const sample = await Sample.findOneAndUpdate(
+      { _id: req.params.sampleId, createdBy: req.user.id },
+      { name, description, status },
+      { new: true }
+    );
+    res.json(sample);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.deleteSample = async (req, res) => {
+  try {
+    const sample = await Sample.findOneAndDelete({
+      _id: req.params.sampleId,
+      createdBy: req.user.id,
+    });
+    res.json({ message: "Sample deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getSampleById = async (req, res) => {
+  try {
+    const sample = await Sample.findOne({
+      _id: req.params.sampleId,
+    });
+    res.json(sample);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.getSamplesByProject = async (req, res) => {
   try {
     const samples = await Sample.find({
       project: req.params.projectId,
-      project: { createdBy: req.user.id },
-    }).populate("assignedTo");
+    });
 
     res.json(samples);
   } catch (error) {
@@ -116,76 +194,3 @@ exports.requestSampleAnalysis = async (req, res) => {
 };
 
 // Analysis and Reporting Controllers
-exports.createReport = async (req, res) => {
-  try {
-    const { projectId } = req.params;
-    const { content, type, sampleId } = req.body;
-
-    const report = new Report({
-      type,
-      content,
-      createdBy: req.user.id,
-      project: projectId,
-      sample: sampleId || null,
-    });
-
-    await report.save();
-
-    // Update project or sample status if needed
-    if (type === "Project") {
-      await Project.findByIdAndUpdate(projectId, {
-        status: "Pending Reports",
-        "finalReport.content": content,
-        "finalReport.publishedAt": new Date(),
-      });
-    } else if (type === "Sample") {
-      await Sample.findByIdAndUpdate(sampleId, {
-        status: "Completed",
-        "report.content": content,
-        "report.createdAt": new Date(),
-      });
-    }
-
-    res.status(201).json({ message: "Report created successfully", report });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-exports.getProjectReports = async (req, res) => {
-  try {
-    const reports = await Report.find({
-      project: req.params.projectId,
-      project: { createdBy: req.user.id },
-    })
-      .populate("createdBy", "name email")
-      .sort({ createdAt: -1 });
-
-    res.json(reports);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-exports.getSampleAnalysisHistory = async (req, res) => {
-  try {
-    const sample = await Sample.findOne({
-      _id: req.params.sampleId,
-      project: { createdBy: req.user.id },
-    }).populate({
-      path: "report",
-      populate: {
-        path: "createdBy",
-        select: "name email",
-      },
-    });
-
-    if (!sample) {
-      return res.status(404).json({ message: "Sample not found" });
-    }
-
-    res.json(sample);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
