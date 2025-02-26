@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../../../components/Header";
 import Sidebar from "../../../../components/Sidebar";
+import { useParams } from "react-router-dom";
 import {
   FaChartLine,
   FaClipboardList,
@@ -12,9 +13,14 @@ import {
   FaUpload,
   FaVial,
 } from "react-icons/fa";
+import axios from "axios";
 
 function AddSample() {
   const navigate = useNavigate();
+  const { projectId } = useParams();
+  onsole.log("Project ID from params:", projectId);
+  const [project, setProject] = useState(null);
+
   const [activeTab, setActiveTab] = useState("projects");
   const [protocolFile, setProtocolFile] = useState(null);
   const [availableTeamMembers, setAvailableTeamMembers] = useState([]);
@@ -140,20 +146,62 @@ function AddSample() {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Prepare final form data including team and methods
-    const finalFormData = {
-      ...formData,
-      teamMembers: selectedTeamMembers,
-      methods: selectedMethods,
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/project/projects/${projectId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setProject(response.data);
+      } catch (error) {
+        console.error("Error fetching project:", error);
+      }
     };
 
-    console.log("Form submitted:", finalFormData);
+    if (projectId) {
+      fetchProject();
+    }
+  }, [projectId]);
 
-    // Navigate back to projects page after submission
-    navigate("/dashboard/researcher/projects");
+  // Update handleSubmit to send samples to the backend
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const token = localStorage.getItem("token");
+      // console.log("Project ID:", projectId);
+     
+
+      // Send each sample to the backend
+      const samplePromises = formData.samples.map((sample) => {
+        return axios.post(
+          `${
+            import.meta.env.VITE_API_URL
+          }/project/project/${projectId}/samples`,
+          sample,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      });
+
+      // Wait for all samples to be added
+      await Promise.all(samplePromises);
+
+      alert("Samples added successfully!");
+    } catch (error) {
+      console.error("Error adding samples:", error);
+      alert("Failed to add samples. Please try again.");
+    }
   };
 
   // Navigation items config
