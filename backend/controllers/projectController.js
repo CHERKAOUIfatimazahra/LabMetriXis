@@ -67,15 +67,38 @@ exports.createProject = async (req, res) => {
 exports.addSampleToProject = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const sampleData = req.body;
+
+    // Parse the sampleData if it exists as a string
+    let sampleData = req.body;
+    if (req.body.sampleData) {
+      sampleData = JSON.parse(req.body.sampleData);
+    }
 
     // Create new sample with project reference
     const sample = new Sample({
-      ...sampleData,
+      name: sampleData.name,
+      description: sampleData.description,
+      type: sampleData.type,
+      quantity: sampleData.quantity,
+      unit: sampleData.unit,
+      collectionDate: sampleData.collectionDate,
+      technicianResponsible: sampleData.technicianResponsible,
+      storageConditions: sampleData.storageConditions || "",
+      expirationDate: sampleData.expirationDate,
+      status: sampleData.status || "Pending",
+      identification: sampleData.identification,
       project: projectId,
       createdBy: req.user._id,
-      technicianResponsible: sampleData.technician || req.user._id,
     });
+
+    // Handle protocol file if it exists
+    if (req.file) {
+      sample.protocolFile = {
+        fileName: req.file.originalname,
+        fileLocation: req.file.path,
+        fileType: req.file.mimetype,
+      };
+    }
 
     await sample.save();
 
@@ -90,10 +113,9 @@ exports.addSampleToProject = async (req, res) => {
     });
   } catch (error) {
     console.error("Error adding sample:", error);
-    res.status(500).json({ error: "Failed to add sample" });
+    res.status(500).json({ error: error.message });
   }
 };
-
 
 exports.getSamplesByProject = async (req, res) => {
   try {
@@ -106,39 +128,6 @@ exports.getSamplesByProject = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 exports.getAllProjects = async (req, res) => {
   try {
