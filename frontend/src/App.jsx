@@ -23,8 +23,8 @@ import PublicationsCreatePage from "./pages/dashboard/researcher/PublicationsCre
 import PublishedProjectsListPage from "./pages/dashboard/researcher/PublishedProjectsListPage";
 import PublishedProjectDetailsPage from "./pages/dashboard/researcher/PublishedProjectDetailsPage";
 
-import TechnicianDashboard from "./pages/dashboard/technician/TechnicianDashboard";
-import AdminDashboard from "./pages/dashboard/admin/AdminDashboard";
+// import TechnicianDashboard from "./pages/dashboard/technician/TechnicianDashboard";
+// import AdminDashboard from "./pages/dashboard/admin/AdminDashboard";
 
 import HomePage from "./pages/HomePage";
 
@@ -38,7 +38,7 @@ function App() {
         <Route path="/verify-email-notice" element={<VerifyEmailNotice />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         {/* <Route path="/reset-password" element={<ResetPassword />} /> */}
-        <Route path="/dashboard/admin" element={<AdminDashboard />} />
+        {/* <Route path="/dashboard/admin" element={<AdminDashboard />} /> */}
         {/* researcher pages */}
         <Route path="/dashboard/researcher" element={<ResearcherDashboard />} />
         <Route
@@ -87,7 +87,7 @@ function App() {
         />
 
         {/* technician pages */}
-        <Route path="/dashboard/technician" element={<TechnicianDashboard />} />
+        {/* <Route path="/dashboard/technician" element={<TechnicianDashboard />} /> */}
         <Route path="/" element={<Login />} />
       </Routes>
     </Router>
