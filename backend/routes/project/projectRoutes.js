@@ -4,6 +4,8 @@ const { verifyToken } = require("../../middleware/authMiddleware");
 const { isChercheur } = require("../../middleware/roleMiddleware");
 const projectController = require("../../controllers/projectController");
 const userController = require("../../controllers/userController");
+const searchController = require("../../controllers/searchController");
+const statistiqueController = require("../../controllers/statistiqueController");
 
 const multer = require("multer");
 const storage = multer.diskStorage({
@@ -52,48 +54,26 @@ router.get(
   projectController.getSamplesByProject
 );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-router.get("/projects", verifyToken, projectController.getAllProjects);
+// Search and statistics routes
 router.get(
-  "/projects/:projectId",
+  "/projects/search",
   verifyToken,
-  projectController.getProjectById
+  isChercheur,
+  searchController.searchProjects
 );
-router.put(
-  "/projects/:projectId",
-  verifyToken,
-  projectController.updateProject
-);
-
-// Sample routes
 router.get(
-  "/projects/:projectId/samples",
+  "/projects/statistics",
   verifyToken,
-  projectController.getSamplesByProject
-);
-router.post(
-  "/samples/:sampleId/request-analysis",
-  verifyToken,
-  projectController.requestSampleAnalysis
+  isChercheur,
+  statistiqueController.getProjectStatistics
 );
 
-// Analysis and reporting routes
+// Get all projects (now paginated through search)
+router.get(
+  "/projects",
+  verifyToken,
+  isChercheur,
+  searchController.searchProjects
+);
 
 module.exports = router;
