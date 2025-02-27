@@ -5,12 +5,31 @@ const { isChercheur } = require("../../middleware/roleMiddleware");
 const projectController = require("../../controllers/projectController");
 const userController = require("../../controllers/userController");
 
-// Project routes
+const multer = require("multer");
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+const upload = multer({ storage: storage });
+
+// get users and user by id
 router.get(
   "/available-team-members",
   verifyToken,
   userController.getAvailableTeamMembers
 );
+
+router.get(
+  "/available-technicians",
+  verifyToken,
+  userController.getAvailableTechnicians
+);
+
+// Project routes
 router.post(
   "/project",
   verifyToken,
@@ -23,6 +42,7 @@ router.post(
   "/projects/:projectId/samples",
   verifyToken,
   isChercheur,
+  upload.single("protocolFile"),
   projectController.addSampleToProject
 );
 
@@ -31,6 +51,14 @@ router.get(
   verifyToken,
   projectController.getSamplesByProject
 );
+
+
+
+
+
+
+
+
 
 
 
@@ -67,6 +95,5 @@ router.post(
 );
 
 // Analysis and reporting routes
-
 
 module.exports = router;
