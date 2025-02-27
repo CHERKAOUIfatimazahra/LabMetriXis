@@ -10,6 +10,7 @@ const sampleSchema = new Schema({
   storageConditions: { type: String },
   collectionDate: { type: Date, required: true },
   expirationDate: { type: Date },
+  identification: { type: String, required: true },
   status: {
     type: String,
     enum: ["Pending", "In Analysis", "Analyzed", "Archived"],
@@ -40,5 +41,7 @@ const sampleSchema = new Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
+
+sampleSchema.index({ identification: 1 }, { unique: true });
 
 module.exports = mongoose.model("Sample", sampleSchema);
