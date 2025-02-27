@@ -13,7 +13,7 @@ const sampleSchema = new Schema({
   identification: { type: String, required: true },
   status: {
     type: String,
-    enum: ["Pending", "In Analysis", "Analyzed", "Archived"],
+    enum: ["Pending", "In Analysis", "Analyzed"],
     default: "Pending",
   },
   protocolFile: {
