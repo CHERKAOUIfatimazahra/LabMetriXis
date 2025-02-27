@@ -39,19 +39,26 @@ const Sidebar = ({
       </nav>
 
       {/* Quick Stats */}
-      <div className="mt-8 border-t pt-4">
-        <h3 className="text-sm font-medium text-gray-500 mb-3">{statsTitle}</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {quickStats.map((stat) => (
-            <div key={stat.id} className={`bg-${stat.color}-50 p-3 rounded-md`}>
-              <p className={`text-xs text-${stat.color}-600`}>{stat.label}</p>
-              <p className={`text-lg font-bold text-${stat.color}-800`}>
-                {stat.value}
-              </p>
-            </div>
-          ))}
+      {quickStats && quickStats.length > 0 && (
+        <div className="mt-8 border-t pt-4">
+          <h3 className="text-sm font-medium text-gray-500 mb-3">
+            {statsTitle}
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {quickStats.map((stat) => (
+              <div
+                key={stat.id}
+                className={`bg-${stat.color}-50 p-3 rounded-md`}
+              >
+                <p className={`text-xs text-${stat.color}-600`}>{stat.label}</p>
+                <p className={`text-lg font-bold text-${stat.color}-800`}>
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 };
