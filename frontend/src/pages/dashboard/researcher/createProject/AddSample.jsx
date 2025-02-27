@@ -1,49 +1,70 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Header from "../../../../components/Header";
 import Sidebar from "../../../../components/Sidebar";
-import { useParams } from "react-router-dom";
 import {
   FaChartLine,
   FaClipboardList,
   FaUsers,
   FaFileAlt,
   FaFlask,
-  FaUserPlus,
   FaUpload,
   FaVial,
 } from "react-icons/fa";
 import axios from "axios";
 
 function AddSample() {
-  const navigate = useNavigate();
   const { projectId } = useParams();
-  onsole.log("Project ID from params:", projectId);
+  const navigate = useNavigate();
   const [project, setProject] = useState(null);
-
   const [activeTab, setActiveTab] = useState("projects");
   const [protocolFile, setProtocolFile] = useState(null);
   const [availableTeamMembers, setAvailableTeamMembers] = useState([]);
-  const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
-  const [storageConditions, setStorageConditions] = useState([]);
-  const [storageLocations, setStorageLocations] = useState([]);
+  const [storageConditions, setStorageConditions] = useState([
+    "Room Temperature",
+    "Refrigerated (2-8°C)",
+    "Frozen (-20°C)",
+    "Ultra-frozen (-80°C)",
+    "Liquid Nitrogen",
+  ]);
+  const [sampleTypes, setSampleTypes] = useState([
+    "Blood",
+    "Tissue",
+    "DNA",
+    "RNA",
+    "Protein",
+    "Cell Culture",
+    "Serum",
+    "Plasma",
+    "Other",
+  ]);
+  const [units, setUnits] = useState([
+    "ml",
+    "µl",
+    "g",
+    "mg",
+    "µg",
+    "cells",
+    "pieces",
+  ]);
 
   // Initial form data state
   const [formData, setFormData] = useState({
     samples: [],
 
-    // New samples properties
+    // New samples properties aligned with schema
     currentSample: {
-      identification: "",
+      name: "",
+      description: "",
       type: "",
       quantity: "",
-      storageConditions: [],
-      storageLocation: [],
-      technician: "",
+      unit: "",
+      storageConditions: "",
       collectionDate: "",
       expirationDate: "",
       protocolFile: null,
-      status: "Available",
+      technicianResponsible: "",
+      status: "Pending",
     },
   });
 
@@ -74,9 +95,13 @@ function AddSample() {
   // Handle adding a new sample
   const handleAddSample = () => {
     if (
-      !formData.currentSample.identification ||
+      !formData.currentSample.name ||
+      !formData.currentSample.description ||
       !formData.currentSample.type ||
-      !formData.currentSample.quantity
+      !formData.currentSample.quantity ||
+      !formData.currentSample.unit ||
+      !formData.currentSample.collectionDate ||
+      !formData.currentSample.technicianResponsible
     ) {
       alert("Veuillez remplir les champs obligatoires de l'échantillon");
       return;
@@ -94,16 +119,17 @@ function AddSample() {
       ],
       // Reset current sample form
       currentSample: {
-        identification: "",
+        name: "",
+        description: "",
         type: "",
         quantity: "",
-        storageConditions: [],
-        storageLocation: [],
-        technician: "",
+        unit: "",
+        storageConditions: "",
         collectionDate: "",
         expirationDate: "",
         protocolFile: null,
-        status: "Available",
+        technicianResponsible: "",
+        status: "Pending",
       },
     });
 
@@ -119,33 +145,7 @@ function AddSample() {
     });
   };
 
-  // Handle removing storage condition from current sample
-  const handleRemoveStorageCondition = (condition) => {
-    setFormData({
-      ...formData,
-      currentSample: {
-        ...formData.currentSample,
-        storageConditions: formData.currentSample.storageConditions.filter(
-          (c) => c !== condition
-        ),
-      },
-    });
-  };
-
-  // Handle removing storage location from current sample
-  const handleRemoveStorageLocation = (location) => {
-    setFormData({
-      ...formData,
-      currentSample: {
-        ...formData.currentSample,
-        storageLocation: formData.currentSample.storageLocation.filter(
-          (l) => l !== location
-        ),
-      },
-    });
-  };
-
-  // Handle form submission
+  // Fetch project data and team members
   useEffect(() => {
     const fetchProject = async () => {
       try {
@@ -164,46 +164,113 @@ function AddSample() {
       }
     };
 
+    const fetchTeamMembers = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/users`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setAvailableTeamMembers(response.data || []);
+      } catch (error) {
+        console.error("Error fetching team members:", error);
+      }
+    };
+
     if (projectId) {
       fetchProject();
+      fetchTeamMembers();
     }
   }, [projectId]);
+
+  // get user id of the technicianResponsible from database
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/project/available-technicians`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        console.log(response.data);
+        setAvailableTeamMembers(response.data || []);
+      } catch (error) {
+        console.error("Error fetching team members:", error);
+      }
+    };
+    fetchTeamMembers();
+  }, []);
 
   // Update handleSubmit to send samples to the backend
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (formData.samples.length === 0) {
+      alert("Veuillez ajouter au moins un échantillon");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
-      // console.log("Project ID:", projectId);
-     
 
-      // Send each sample to the backend
-      const samplePromises = formData.samples.map((sample) => {
-        return axios.post(
-          `${
-            import.meta.env.VITE_API_URL
-          }/project/project/${projectId}/samples`,
-          sample,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+      const samplePromises = formData.samples.map(async (sample) => {
+        // Create a regular JSON object instead of FormData
+        const sampleData = {
+          name: sample.name,
+          description: sample.description,
+          type: sample.type,
+          quantity: sample.quantity,
+          unit: sample.unit,
+          storageConditions: sample.storageConditions,
+          collectionDate: sample.collectionDate,
+          technicianResponsible: sample.technicianResponsible,
+          status: sample.status,
+          identification: `${sample.type}-${Date.now()}`,
+        };
+
+        // Add optional fields only if they exist
+        if (sample.expirationDate) {
+          sampleData.expirationDate = sample.expirationDate;
+        }
+
+        // If you need to handle file uploads, you'll still need FormData
+        if (sample.protocolFile) {
+          // Create FormData for file upload
+          const fileData = new FormData();
+          fileData.append("protocolFile", sample.protocolFile);
+          fileData.append("sampleData", JSON.stringify(sampleData));
+
+          return axios.post(
+            `${
+              import.meta.env.VITE_API_URL
+            }/project/projects/${projectId}/samples`,
+            fileData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+        }
       });
 
-      // Wait for all samples to be added
       await Promise.all(samplePromises);
-
-      alert("Samples added successfully!");
+      console.log("Samples added successfully!");
+      navigate(`/dashboard/researcher/projects`);
     } catch (error) {
       console.error("Error adding samples:", error);
-      alert("Failed to add samples. Please try again.");
+      alert("Échec lors de l'ajout des échantillons. Veuillez réessayer.");
     }
   };
-
   // Navigation items config
   const navItems = [
     {
@@ -269,7 +336,6 @@ function AddSample() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Component */}
-
       <Header
         title="LabMetriXis - Recherche Scientifique"
         userName="Dr. Roberts"
@@ -295,7 +361,7 @@ function AddSample() {
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">
-                  Créer un nouveau projet de recherche
+                  Ajouter des échantillons au projet
                 </h1>
               </div>
 
@@ -310,15 +376,29 @@ function AddSample() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Identification*
+                          Nom de l'échantillon*
                         </label>
                         <input
                           type="text"
-                          name="identification"
-                          value={formData.currentSample.identification}
+                          name="name"
+                          value={formData.currentSample.name}
                           onChange={handleSampleChange}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          placeholder="ID unique de l'échantillon"
+                          placeholder="Nom unique de l'échantillon"
+                        />
+                      </div>
+
+                      <div className="lg:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Description*
+                        </label>
+                        <input
+                          type="text"
+                          name="description"
+                          value={formData.currentSample.description}
+                          onChange={handleSampleChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          placeholder="Description courte de l'échantillon"
                         />
                       </div>
 
@@ -326,14 +406,19 @@ function AddSample() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Type d'échantillon*
                         </label>
-                        <input
-                          type="text"
+                        <select
                           name="type"
                           value={formData.currentSample.type}
                           onChange={handleSampleChange}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          placeholder="Ex: Sang, Tissu, ADN..."
-                        />
+                        >
+                          <option value="">Sélectionner un type</option>
+                          {sampleTypes.map((type, idx) => (
+                            <option key={idx} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       <div>
@@ -341,41 +426,58 @@ function AddSample() {
                           Quantité*
                         </label>
                         <input
-                          type="text"
+                          type="number"
                           name="quantity"
                           value={formData.currentSample.quantity}
                           onChange={handleSampleChange}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          placeholder="Ex: 5ml, 10g..."
+                          placeholder="Ex: 5, 10, 25..."
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Technicien responsable
+                          Unité*
                         </label>
                         <select
-                          name="technician"
-                          value={formData.currentSample.technician}
+                          name="unit"
+                          value={formData.currentSample.unit}
                           onChange={handleSampleChange}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
                         >
-                          <option value="">Sélectionner un technicien</option>
-                          {availableTeamMembers
-                            .filter((member) =>
-                              member.role.includes("Technicien")
-                            )
-                            .map((tech) => (
-                              <option key={tech.id} value={tech.name}>
-                                {tech.name}
-                              </option>
-                            ))}
+                          <option value="">Sélectionner une unité</option>
+                          {units.map((unit, idx) => (
+                            <option key={idx} value={unit}>
+                              {unit}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Date de collecte
+                          Technicien responsable*
+                        </label>
+                        <select
+                          name="technicianResponsible"
+                          value={formData.currentSample.technicianResponsible}
+                          onChange={handleSampleChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          <option value="">Sélectionner un technicien</option>
+                          {availableTeamMembers.map((tech) => (
+                            <option key={tech._id} value={tech._id}>
+                              {tech.firstName && tech.lastName
+                                ? `${tech.firstName} ${tech.lastName}`
+                                : tech.name || tech.email}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Date de collecte*
                         </label>
                         <input
                           type="date"
@@ -397,6 +499,25 @@ function AddSample() {
                           onChange={handleSampleChange}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Conditions de stockage
+                        </label>
+                        <select
+                          name="storageConditions"
+                          value={formData.currentSample.storageConditions}
+                          onChange={handleSampleChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          <option value="">Sélectionner une condition</option>
+                          {storageConditions.map((condition, idx) => (
+                            <option key={idx} value={condition}>
+                              {condition}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       <div>
@@ -424,88 +545,7 @@ function AddSample() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Conditions de stockage
-                        </label>
-                        <div className="flex gap-2 mb-2">
-                          <select className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500">
-                            <option value="">Sélectionner une condition</option>
-                            {storageConditions.map((condition, idx) => (
-                              <option key={idx} value={condition}>
-                                {condition}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        {formData.currentSample.storageConditions.length >
-                          0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {formData.currentSample.storageConditions.map(
-                              (condition, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2 py-1 rounded text-sm font-medium bg-blue-100 text-blue-800"
-                                >
-                                  {condition}
-                                  <button
-                                    type="button"
-                                    className="ml-1 text-blue-600 hover:text-blue-800"
-                                    onClick={() =>
-                                      handleRemoveStorageCondition(condition)
-                                    }
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Lieu de stockage
-                        </label>
-                        <div className="flex gap-2 mb-2">
-                          <select className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500">
-                            <option value="">Sélectionner un lieu</option>
-                            {storageLocations.map((location, idx) => (
-                              <option key={idx} value={location}>
-                                {location}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        {formData.currentSample.storageLocation.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {formData.currentSample.storageLocation.map(
-                              (location, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2 py-1 rounded text-sm font-medium bg-purple-100 text-purple-800"
-                                >
-                                  {location}
-                                  <button
-                                    type="button"
-                                    className="ml-1 text-purple-600 hover:text-purple-800"
-                                    onClick={() =>
-                                      handleRemoveStorageLocation(location)
-                                    }
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end">
+                    <div className="flex justify-end mt-4">
                       <button
                         type="button"
                         onClick={handleAddSample}
@@ -528,7 +568,7 @@ function AddSample() {
                           <thead className="bg-gray-50">
                             <tr>
                               <th className="py-2 px-3 border-b text-left">
-                                ID
+                                Nom
                               </th>
                               <th className="py-2 px-3 border-b text-left">
                                 Type
@@ -537,7 +577,7 @@ function AddSample() {
                                 Quantité
                               </th>
                               <th className="py-2 px-3 border-b text-left">
-                                Technicien
+                                Date de collecte
                               </th>
                               <th className="py-2 px-3 border-b text-left">
                                 Conditions
@@ -554,32 +594,32 @@ function AddSample() {
                             {formData.samples.map((sample) => (
                               <tr key={sample.id} className="hover:bg-gray-50">
                                 <td className="py-2 px-3 border-b font-medium">
-                                  {sample.identification}
+                                  {sample.name}
                                 </td>
                                 <td className="py-2 px-3 border-b">
                                   {sample.type}
                                 </td>
                                 <td className="py-2 px-3 border-b">
-                                  {sample.quantity}
+                                  {sample.quantity} {sample.unit}
                                 </td>
                                 <td className="py-2 px-3 border-b">
-                                  {sample.technician || "-"}
+                                  {new Date(
+                                    sample.collectionDate
+                                  ).toLocaleDateString()}
                                 </td>
                                 <td className="py-2 px-3 border-b">
-                                  {sample.storageConditions.join(", ") || "-"}
+                                  {sample.storageConditions || "-"}
                                 </td>
                                 <td className="py-2 px-3 border-b">
                                   <span
                                     className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                                      sample.status === "Available"
-                                        ? "bg-green-100 text-green-800"
-                                        : sample.status === "In Use"
+                                      sample.status === "Pending"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : sample.status === "In Analysis"
                                         ? "bg-blue-100 text-blue-800"
-                                        : sample.status === "Depleted"
-                                        ? "bg-red-100 text-red-800"
-                                        : sample.status === "Compromised"
-                                        ? "bg-orange-100 text-orange-800"
-                                        : "bg-purple-100 text-purple-800"
+                                        : sample.status === "Analyzed"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-gray-100 text-gray-800"
                                     }`}
                                   >
                                     {sample.status}
@@ -608,10 +648,19 @@ function AddSample() {
                 {/* Boutons de soumission */}
                 <div className="mt-8 flex justify-end space-x-4">
                   <button
+                    type="button"
+                    onClick={() =>
+                      navigate(`/dashboard/researcher/projects/${projectId}`)
+                    }
+                    className="px-6 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                  >
+                    Annuler
+                  </button>
+                  <button
                     type="submit"
                     className="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700"
                   >
-                    add sampeles to project
+                    Ajouter les échantillons au projet
                   </button>
                 </div>
               </form>

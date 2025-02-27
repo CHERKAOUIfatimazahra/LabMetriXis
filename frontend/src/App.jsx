@@ -50,7 +50,7 @@ function App() {
           element={<ProjectCreatePage />}
         />
         <Route
-          path="/dashboard/researcher/projects/create/add-sample/:id"
+          path="/dashboard/researcher/projects/create/add-sample/:projectId"
           element={<AddSample />}
         />
         <Route
