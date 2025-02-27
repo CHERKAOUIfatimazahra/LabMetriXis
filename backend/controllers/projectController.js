@@ -131,149 +131,40 @@ exports.getSamplesByProject = async (req, res) => {
 
 exports.getAllProjects = async (req, res) => {
   try {
-    const projects = await Project.find({ createdBy: req.user.id })
-      .populate("samples")
-      .sort({ createdAt: -1 });
-    res.json(projects);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+    // Check if user is authenticated
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized access" });
+    }
 
-exports.getProjectById = async (req, res) => {
-  try {
-    const project = await Project.findOne({
-      _id: req.params.projectId,
-      createdBy: req.user.id,
+    // Find projects where the authenticated user is either the creator or the team leader
+    const projects = await Project.find({
+      $or: [
+        { createdBy: req.user.id }, // User created the project
+        { teamLead: req.user.id }, // User is the team lead
+      ],
     }).populate("samples");
 
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
+    // Calculate progress for each project based on analyzed samples
+    const projectsWithProgress = projects.map((project) => {
+      const totalSamples = project.samples.length;
+      const analyzedSamples = project.samples.filter(
+        (sample) => sample.status === "Analyzed"
+      ).length;
 
-    res.json(project);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+      const progress =
+        totalSamples === 0
+          ? 0
+          : Math.round((analyzedSamples / totalSamples) * 100);
 
-exports.updateProject = async (req, res) => {
-  try {
-    const { title, description, status } = req.body;
-    const project = await Project.findOneAndUpdate(
-      { _id: req.params.projectId, createdBy: req.user.id },
-      { title, description, status },
-      { new: true }
-    );
-
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
-
-    res.json({ message: "Project updated successfully", project });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Sample Management Controllers
-exports.createSample = async (req, res) => {
-  try {
-    const { name, description, project } = req.body;
-    const sample = await Sample.create({
-      name,
-      description,
-      project: project._id,
-      createdBy: req.user.id,
-      status: "Assigned",
-      assignedTo: project.createdBy,
-    });
-    res.json(sample);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-exports.updateSample = async (req, res) => {
-  try {
-    const { name, description, status } = req.body;
-    const sample = await Sample.findOneAndUpdate(
-      { _id: req.params.sampleId, createdBy: req.user.id },
-      { name, description, status },
-      { new: true }
-    );
-    res.json(sample);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-exports.deleteSample = async (req, res) => {
-  try {
-    const sample = await Sample.findOneAndDelete({
-      _id: req.params.sampleId,
-      createdBy: req.user.id,
-    });
-    res.json({ message: "Sample deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-exports.getSampleById = async (req, res) => {
-  try {
-    const sample = await Sample.findOne({
-      _id: req.params.sampleId,
-    });
-    res.json(sample);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-exports.getSamplesByProject = async (req, res) => {
-  try {
-    const samples = await Sample.find({
-      project: req.params.projectId,
+      return {
+        ...project.toObject(),
+        progress: progress,
+      };
     });
 
-    res.json(samples);
+    res.json(projectsWithProgress);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-exports.requestSampleAnalysis = async (req, res) => {
-  try {
-    const { sampleId } = req.params;
-    const { analysisType, priority } = req.body;
-
-    const sample = await Sample.findOneAndUpdate(
-      {
-        _id: sampleId,
-        project: { createdBy: req.user.id },
-      },
-      {
-        status: "In Progress",
-        $push: {
-          analysisRequests: {
-            type: analysisType,
-            priority,
-            requestedAt: new Date(),
-          },
-        },
-      },
-      { new: true }
-    );
-
-    if (!sample) {
-      return res.status(404).json({ message: "Sample not found" });
-    }
-
-    res.json({ message: "Analysis requested successfully", sample });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Analysis and Reporting Controllers
